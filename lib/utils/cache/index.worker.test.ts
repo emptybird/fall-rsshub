@@ -59,6 +59,16 @@ describe('worker cache with KV binding', () => {
         expect(await env.CACHE.get('rsshub:cacheTtl:worker:default-ttl')).toBeNull();
     });
 
+    it('clamps expiry below the KV minimum instead of failing the put', async () => {
+        // twitter locks its auth token for 20s and unlocks with a 1s ttl
+        await kv.set('worker:short-ttl', '1', 20);
+        expect(await kv.get('worker:short-ttl', false)).toBe('1');
+        expect(await kv.get('worker:short-ttl')).toBe('1');
+
+        await cache.globalCache.set('worker:global-short-ttl', '', 1);
+        expect(await cache.globalCache.get('worker:global-short-ttl')).toBe('');
+    });
+
     it('rejects keys using the reserved ttl prefix', async () => {
         await expect(kv.get('rsshub:cacheTtl:foo')).rejects.toThrow('reserved');
     });

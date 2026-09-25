@@ -11,6 +11,12 @@ let kvNamespace: KVNamespace | null = null;
 
 const status = { available: false };
 
+// KV rejects expiration_ttl below 60 seconds
+const KV_MIN_TTL = 60;
+
+/** Clamp a TTL in seconds to what KV accepts; short-lived keys (e.g. token locks) just live a little longer */
+export const kvTtl = (seconds: number) => (Number.isFinite(seconds) ? Math.max(KV_MIN_TTL, Math.ceil(seconds)) : KV_MIN_TTL);
+
 const getCacheTtlKey = (key: string) => {
     if (key.startsWith('rsshub:cacheTtl:')) {
         throw new Error('"rsshub:cacheTtl:" prefix is reserved for the internal usage, please change your cache key');
@@ -35,7 +41,7 @@ export default {
             const [value, cacheTtl] = await Promise.all([kvNamespace.get(key), kvNamespace.get(cacheTtlKey)]);
 
             if (value && refresh) {
-                const ttl = cacheTtl ? Number(cacheTtl) : config.cache.contentExpire;
+                const ttl = kvTtl(cacheTtl ? Number(cacheTtl) : config.cache.contentExpire);
                 // Refresh TTL by re-setting the value
                 // KV doesn't have a native expire refresh, so we need to re-put
                 // Use waitUntil pattern in production for non-blocking refresh
@@ -61,11 +67,11 @@ export default {
             return;
         }
 
-        const promises: Array<Promise<void>> = [kvNamespace.put(key, stored, { expirationTtl: maxAge })];
+        const promises: Array<Promise<void>> = [kvNamespace.put(key, stored, { expirationTtl: kvTtl(maxAge) })];
 
         if (maxAge !== config.cache.contentExpire) {
             // Store the cache ttl if it is not the default value
-            promises.push(kvNamespace.put(getCacheTtlKey(key), String(maxAge), { expirationTtl: maxAge }));
+            promises.push(kvNamespace.put(getCacheTtlKey(key), String(maxAge), { expirationTtl: kvTtl(maxAge) }));
         }
 
         await Promise.all(promises);
