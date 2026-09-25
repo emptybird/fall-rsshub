@@ -3,6 +3,12 @@ main = "dist-worker/worker.mjs"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["global_fetch_strictly_public"]
 
+# Only fall-sync calls this Worker, through a Service Binding: keep it off the public internet
+workers_dev = false
+preview_urls = false
+# Cookies and tokens are set in the dashboard; don't let deploys delete them
+keep_vars = true
+
 find_additional_modules = true
 base_dir = "dist-worker/modules"
 rules = [{ type = "Data", globs = ["data_files/**"], fallthrough = true }]
